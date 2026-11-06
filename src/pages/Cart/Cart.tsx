@@ -7,6 +7,8 @@ import Timer from "../../components/Timer";
 import { useCartStore } from "../../useCartStore";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { isAxiosError } from "axios";
+import { createOrder, type OrderErrorResponse } from "../../api/orders";
 
 
 const Cart = () => {
@@ -28,6 +30,7 @@ const Cart = () => {
     (item) => item.id === cartStore?.id
   );
   const [timeLeft, setTimeLeft] = useState<number>(60);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
 
   useEffect(() => {
@@ -47,23 +50,44 @@ const Cart = () => {
     return null;
   }
 
-  const menu = store.menus[0];
-
-  if (!menu) {
-    return null;
-  }
-
   const orderPrice = menus.reduce((sum, menu) => sum + menu.price * menu.quantity, 0);
 
   const totalPrice = orderPrice + store.deliveryFee;
   const canOrder =
-    orderPrice >= store.minDeliveryPrice &&
     menus.length > 0 &&
     timeLeft > 0;
 
   const handleOrderCancel = () => {
     clearCart();
     navigate("/store");
+  };
+
+  const handleOrder = async () => {
+    if (!canOrder || isSubmitting) return;
+
+      (true);
+    try {
+      const result = await createOrder({
+        storeId: store.id,
+        items: menus.map((menu) => ({
+          menuId: menu.id,
+          quantity: menu.quantity,
+        })),
+      });
+      alert(`주문 상태: ${result.status}\n결제금액: ${result.totalPrice.toLocaleString()}원`);
+    } catch (error) {
+      if (
+        isAxiosError<OrderErrorResponse>(error) &&
+        error.response?.status === 400 &&
+        error.response.data.code === "MINIMUM_ORDER_NOT_MET"
+      ) {
+        alert(error.response.data.message);
+      } else {
+        alert("주문에 실패했습니다. 다시 시도해 주세요.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
 
@@ -119,6 +143,8 @@ const Cart = () => {
         totalPrice={totalPrice}
         minDeliveryPrice={store.minDeliveryPrice}
         canOrder={canOrder}
+        isSubmitting={isSubmitting}
+        onOrder={handleOrder}
       />
     </div>
   );
